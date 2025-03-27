@@ -1,18 +1,15 @@
-To create a new Terraform module named `azurerm_virtual_network`, we'll need to define several components, including variables, outputs, and the main resource configuration. This module will focus on creating an Azure Virtual Network. Here’s a structured approach to building this module:
+To create a new Terraform module named `azurerm_virtual_network`, we'll follow best practices and ensure consistency in variable naming and structure. I'll outline the necessary files and their contents for this module. The module will include a main Terraform configuration file, a variables file, and an outputs file.
 
 ### Directory Structure
-First, set up the directory structure for your module:
-
 ```
 azurerm_virtual_network/
 ├── main.tf
 ├── variables.tf
-├── outputs.tf
-└── README.md
+└── outputs.tf
 ```
 
 ### main.tf
-This file will contain the main logic for creating an Azure Virtual Network.
+This file will define the `azurerm_virtual_network` resource using the Azure provider. 
 
 ```hcl
 provider "azurerm" {
@@ -20,31 +17,28 @@ provider "azurerm" {
 }
 
 resource "azurerm_virtual_network" "this" {
-  name                = var.name
+  name                = var.vnet_name
+  address_space       = var.address_space
   location            = var.location
   resource_group_name = var.resource_group_name
-  address_space       = var.address_space
+  tags                = var.tags
 
-  tags = var.tags
+  dynamic "subnet" {
+    for_each = var.subnets
+    content {
+      name           = subnet.value.name
+      address_prefix = subnet.value.address_prefix
+    }
+  }
 }
 ```
 
 ### variables.tf
-Define the input variables for the module. These variables provide flexibility to the module, allowing users to customize the virtual network.
+This file will define the input variables for the module. 
 
 ```hcl
-variable "name" {
+variable "vnet_name" {
   description = "The name of the virtual network."
-  type        = string
-}
-
-variable "location" {
-  description = "The location/region where the virtual network is created. Changing this forces a new resource to be created."
-  type        = string
-}
-
-variable "resource_group_name" {
-  description = "The name of the resource group in which to create the virtual network."
   type        = string
 }
 
@@ -53,64 +47,76 @@ variable "address_space" {
   type        = list(string)
 }
 
+variable "location" {
+  description = "The location/region where the virtual network is created."
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "The name of the resource group in which to create the virtual network."
+  type        = string
+}
+
+variable "subnets" {
+  description = "A list of subnets to associate with the virtual network."
+  type = list(object({
+    name           = string
+    address_prefix = string
+  }))
+}
+
 variable "tags" {
-  description = "A mapping of tags to assign to the resource."
+  description = "A map of tags to assign to the resource."
   type        = map(string)
   default     = {}
 }
 ```
 
 ### outputs.tf
-Define the outputs for the module. These outputs can be used by other modules or configurations that utilize this module.
+This file will define the outputs for the module.
 
 ```hcl
-output "virtual_network_id" {
+output "vnet_id" {
   description = "The ID of the virtual network."
   value       = azurerm_virtual_network.this.id
 }
 
-output "virtual_network_name" {
+output "vnet_name" {
   description = "The name of the virtual network."
   value       = azurerm_virtual_network.this.name
 }
 
-output "virtual_network_address_space" {
+output "vnet_address_space" {
   description = "The address space of the virtual network."
   value       = azurerm_virtual_network.this.address_space
 }
 ```
 
-### README.md
-Provide a basic documentation for the module to help users understand how to use it.
-
-```markdown
-# AzureRM Virtual Network Module
-
-This module creates an Azure Virtual Network.
-
-## Usage
+### Usage Example
+This is how you might use this module in a parent Terraform configuration:
 
 ```hcl
-module "virtual_network" {
+module "vnet" {
   source              = "./azurerm_virtual_network"
-  name                = "my-vnet"
-  location            = "West US"
-  resource_group_name = "my-resource-group"
+  vnet_name           = "my-vnet"
   address_space       = ["10.0.0.0/16"]
-
+  location            = "East US"
+  resource_group_name = "my-resource-group"
+  subnets = [
+    {
+      name           = "subnet1"
+      address_prefix = "10.0.1.0/24"
+    },
+    {
+      name           = "subnet2"
+      address_prefix = "10.0.2.0/24"
+    },
+  ]
   tags = {
-    environment = "dev"
-    project     = "my-project"
+    Environment = "Dev"
+    Project     = "TerraformExample"
   }
 }
 ```
 
-## Inputs
-
-| Name                | Description                                                              | Type         | Default | Required |
-|---------------------|--------------------------------------------------------------------------|--------------|---------|----------|
-| `name`              | The name of the virtual network.                                         | `string`     | n/a     | yes      |
-| `location`          | The location/region where the virtual network is created.                | `string`     | n/a     | yes      |
-| `resource_group_name` | The name of the resource group in which to create the virtual network. | `string`     | n/a     | yes      |
-| `address_space`     | The address space that is used by the virtual network.                   | `list(string)` | n/a   | yes      |
-| `tags`              | A mapping of tags to assign to the resource.                            
+This module provides a clean and reusable way to create Azure virtual networks with subnets, following Terraform's best practices for module design.
